@@ -2,21 +2,10 @@ import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QTableWidgetItem
 from uiloader import loadUi
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, NamedStyle
+from openpyxl.styles import Font, Alignment, NamedStyle, Border, Side, PatternFill
 from pathlib import Path
-
-class Ogrenci:
-    def __init__(self, ogrno, sube, adi, ogretim, kitapcik, cevaplar) -> None:
-        self.ogrno = ogrno
-        self.adi = adi.strip()
-        self.sube = sube
-        self.ogretim = ogretim
-        self.kitapcik = kitapcik
-        self.cevaplar = cevaplar
-        self.dogru = 0
-        self.yanlis = 0
-        self.bos = 0
-        self.puan = 0
+from learning_outcome import LearningOutcomeModel, ComboBoxDelegate
+from exam import Ogrenci, Exam, Answers
 
 class MyMainWindow(QMainWindow):
     def __init__(self):
@@ -24,24 +13,39 @@ class MyMainWindow(QMainWindow):
         loadUi("mainwindow.ui", self)
         self.dosyaAc.clicked.connect(self.dosya_ac)
         self.exceleAktar.clicked.connect(self.excele_aktar)
-        self.students = []
-        self.answers = {}
-        self.question_count = {}
+        self.okIliskilendir.stateChanged.connect(self.iliskilendir)
+        self.table_model = None
+        self.exam = None
         self.set_table_headers()
 
-    def excele_aktar(self):
-        filename,_ = QFileDialog.getSaveFileName(self, "Excel'e Aktar", self.dersinAdi.text()+".xlsx", "Excel dosyaları(*.xlsx)")
-        if not filename:
-            return
-        wb = Workbook()
-        ws = wb.active
+    def iliskilendir(self):
+        #print(self.okIliskilendir.isChecked())
+        if self.okIliskilendir.isChecked():
+            soru_sayisi = self.exam.answers[max(self.exam.answers, key=lambda a:self.exam.answers[a].question_count)].question_count
+            qlist = [f"Soru {i+1}" for i in range(soru_sayisi)]
+            oksayisi = self.okSayisi.value()
+            oklist = [f"ÖK{i+1}" for i in range(oksayisi)]
+            gruplar = list(self.exam.answers.keys())
+            self.table_model = LearningOutcomeModel(qlist, oklist, gruplar)
+            self.okTablo.setModel(self.table_model)
+
+            delegate = ComboBoxDelegate(oklist)
+            for sutun in range(1, len(gruplar)+1):
+                self.okTablo.setItemDelegateForColumn(sutun, delegate)
+
+
+
+    def get_excel_column_name(self):
+        s1 = " ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        s2 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        for a in s1:
+            for b in s2:
+                yield (a+b).strip()
+
+    def default_sheet(self, ws, style):
+        ws.title = "Notlar"
         for w,c in zip([90, 300, 50, 50, 50, 50, 50, 50],"ABCDEFGH"):
             ws.column_dimensions[c].width = w*0.13
-
-        style = NamedStyle("Baslik")
-        style.font = Font(bold=True)
-        style.alignment = Alignment(horizontal="center")
-        wb.add_named_style(style)
 
         ws.append(["Pamukkale Üniversitesi Mühendislik Fakültesi Test Sonuçları"])
         ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=8)
@@ -54,11 +58,11 @@ class MyMainWindow(QMainWindow):
         ws.append(["Öğr.No.", "Adı", "Şube", "Kitapçık Türü", "Doğru", "Yanlış", "Boş", "Puan"])
 
         if self.ogrnoSirala.isChecked():
-            ogrenciler = sorted(self.students, key=lambda ogr: ogr.ogrno)
+            ogrenciler = sorted(self.exam.students, key=lambda ogr: ogr.ogrno)
         elif self.notSirala.isChecked():
-            ogrenciler = sorted(self.students, key=lambda ogr: ogr.puan, reverse=True)
+            ogrenciler = sorted(self.exam.students, key=lambda ogr: ogr.puan, reverse=True)
         else:
-            ogrenciler = self.students
+            ogrenciler = self.exam.students
 
         for ogrenci in ogrenciler:
             ws.append([ogrenci.ogrno,
@@ -69,7 +73,86 @@ class MyMainWindow(QMainWindow):
                        ogrenci.yanlis,
                        ogrenci.bos,
                        ogrenci.puan])
+
+
+    def ogrenci_cevaplari(self, ss):
+        correct_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Light green
+        incorrect_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # Light red
+        current_row = 2
+        maxq = self.exam.answers[max(self.exam.answers, key=lambda a:self.exam.answers[a].question_count)].question_count
+        header = ["Öğr.No.", "Adı", "Grubu"] + [f"S{i+1}" for i in range(maxq)]
+        ss.append(header)
+        # set column widhts
+        widhts = [90, 300, 60] + [25] * maxq
+        for w, c in zip(widhts, self.get_excel_column_name()):
+            ss.column_dimensions[c].width = w * 0.13
+        for g in self.exam.answers:
+            answer:Answers = self.exam.answers[g]
+            row = ["", "CEVAP", g] + [c for c in answer.answers]
+            ss.append(row)
+            current_row += 1
+            for student in filter(lambda s:s.kitapcik == g, self.exam.students):
+                corrects = []
+                student_answers = []
+                for q in range(answer.question_count):
+                    student_answers.append(answer.get_student_answer(q, student.cevaplar))
+                    corrects.append(answer.check_question(q, student_answers))
+                srow = [student.ogrno, student.adi, student.kitapcik] + student_answers
+                ss.append(srow)
+                # Fill backround colors(correct/incorrect)
+                for column in range(answer.question_count):
+                    cell = ss.cell(current_row, column+4)
+                    cell.fill = correct_fill if corrects[column] else incorrect_fill
+                current_row += 1
+
+
+    def excele_aktar(self):
+        filename,_ = QFileDialog.getSaveFileName(self, "Excel'e Aktar", self.dersinAdi.text()+".xlsx", "Excel dosyaları(*.xlsx)")
+        if not filename:
+            return
+        wb = Workbook()
+
+        style = NamedStyle("Baslik")
+        style.font = Font(bold=True)
+        style.alignment = Alignment(horizontal="center")
+        wb.add_named_style(style)
+
+        ws = wb.active
+        self.default_sheet(ws, style)
+        students_sheet = wb.create_sheet("Öğrenci Cevapları")
+        self.ogrenci_cevaplari(students_sheet)
+
+        if self.okIliskilendir.isChecked():
+            self.exam.calculate_learnig_outcome_contributions(*self.table_model.get_group_outcome_mapping())
+            outcome_sheet = wb.create_sheet("Öğrenme Çıktıları İlişkisi")
+            self.iliski_yazdir(outcome_sheet)
+
+
         wb.save(filename)
+
+    def iliski_yazdir(self, rs):
+        soru_sayisi = self.exam.answers[max(self.exam.answers, key=lambda a:self.exam.answers[a].question_count)].question_count
+        widths = [100] + [50]*soru_sayisi
+        for w, c in zip(widths, self.get_excel_column_name()):
+            rs.column_dimensions[c].width = w * 0.13
+        rs.append(["Grup Adı"]+[f"S{i+1}" for i in range(soru_sayisi)])
+        for answer in self.exam.answers.values():
+            alist = [answer.group] + [f"ÖK{ok+1}" for i,ok in self.exam.outcome_mapping[answer.group].items()]
+            rs.append(alist)
+            slist = [answer.group] + [f"{a['correct percentage']:.2f}" for a in answer.statistics]
+            rs.append(slist)
+
+        rs.append([])
+        rs.append(["Grup-ÖK İlişkisi"])
+        ok_sayisi = len(next(iter(self.exam.group_outcome_means.values())))
+        rs.append([""]+[f"ÖK{i+1}" for i in range(ok_sayisi)])
+        for answer in self.exam.group_outcome_means:
+            rs.append([answer]+[f"{m:.2f}" for m in self.exam.group_outcome_means[answer].values()])
+
+        rs.append([])
+        rs.append(["Sınav-ÖK Katkısı(Grup ağırlıklı ortalaması)"])
+        rs.append([""]+[f"ÖK{i+1}" for i in range(ok_sayisi)])
+        rs.append([""]+[f"{k:.2f}" for k in self.exam.outcomes])
 
 
     def set_table_headers(self):
@@ -83,36 +166,22 @@ class MyMainWindow(QMainWindow):
         filename,_ = QFileDialog.getOpenFileName(self, "Dosya Aç", ".", "Metin dosyaları(*.txt)")
         if not filename:
             return
-        self.students = []
-        self.answers = {}
-        self.question_count = {}
-        self.toplam_puan = self.toplamPuan.value()
-        self.dersinAdi.setText(Path(filename).stem)
-        with open(filename, encoding="ISO-8859-9") as f:
-            lines = f.readlines()
-        for line in lines:
-            ogr, liste = self.process_line(line)
-            if ogr:
-                self.students.append(Ogrenci(*liste))
-            else:
-                self.answers[liste[0]] = liste[1]
-                self.question_count[liste[0]] = len(list(filter(lambda a:a!=" ", liste[1])))
-            # print(liste)
-        self.kitapcikSayisi.setText(str(len(self.answers)))
-        self.ogrenciSayisi.setText(str(len(self.students)))
-        self.not_hesapla()
+
+        self.exam = Exam(filename, self.toplamPuan.value())
+        self.kitapcikSayisi.setText(str(self.exam.group_count))
+        self.ogrenciSayisi.setText(str(self.exam.total_student_count))
         self.not_goster()
 
     def not_goster(self):
         # self.notlarTablo.clear()
-        self.notlarTablo.setRowCount(len(self.students))
+        self.notlarTablo.setRowCount(len(self.exam.students))
         nt = self.notlarTablo
         if self.ogrnoSirala.isChecked():
-            ogrenciler = sorted(self.students, key=lambda ogr: ogr.ogrno)
+            ogrenciler = sorted(self.exam.students, key=lambda ogr: ogr.ogrno)
         elif self.notSirala.isChecked():
-            ogrenciler = sorted(self.students, key=lambda ogr: ogr.puan, reverse=True)
+            ogrenciler = sorted(self.exam.students, key=lambda ogr: ogr.puan, reverse=True)
         else:
-            ogrenciler = self.students
+            ogrenciler = self.exam.students
 
         for i, ogrenci in enumerate(ogrenciler):
             nt.setItem(i, 0, QTableWidgetItem(ogrenci.ogrno))
@@ -123,32 +192,6 @@ class MyMainWindow(QMainWindow):
             nt.setItem(i, 5, QTableWidgetItem(str(ogrenci.yanlis)))
             nt.setItem(i, 6, QTableWidgetItem(str(ogrenci.bos)))
             nt.setItem(i, 7, QTableWidgetItem(str(ogrenci.puan)))
-
-    def not_hesapla(self):
-        for ogrenci in self.students:
-            if ogrenci.kitapcik not in self.answers:
-                kitapcik = next(iter(self.answers))
-            else:
-                kitapcik = ogrenci.kitapcik
-
-            dogrular = self.answers[kitapcik]
-            for o,a in zip(ogrenci.cevaplar, dogrular):
-                if a != " ":
-                    if o == a:
-                        ogrenci.dogru += 1
-                    elif o == " ":
-                        ogrenci.bos += 1
-                    else:
-                        ogrenci.yanlis += 1
-            ogrenci.puan = round(ogrenci.dogru/self.question_count[kitapcik]*self.toplam_puan)
-            # print(ogrenci)
-
-
-    def process_line(self, line):
-        if line[11:16] == "CEVAP":
-            return False, [line[36], line[37:137]]
-        else:
-            return True, [line[:8], line[8:11], line[11:35], line[35], line[36], line[37:137]]
 
 
 if __name__ == "__main__":
