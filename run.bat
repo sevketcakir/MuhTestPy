@@ -16,4 +16,4 @@ if not exist "%venv_dir%" (
 )
 
 echo Running main.py...
-python main.py
+pythonw main.py
