@@ -1,4 +1,5 @@
 import sys
+import os
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QTableWidgetItem
 from uiloader import loadUi
 from openpyxl import Workbook
@@ -86,17 +87,17 @@ class MyMainWindow(QMainWindow):
         widhts = [90, 300, 60] + [25] * maxq
         for w, c in zip(widhts, self.get_excel_column_name()):
             ss.column_dimensions[c].width = w * 0.13
-        for g in self.exam.answers:
+        for i,g in enumerate(self.exam.answers):
             answer:Answers = self.exam.answers[g]
-            row = ["", "CEVAP", g] + [c for c in answer.answers]
+            row = ["", "CEVAP", g] + [c for c in answer.answers if c != " "]
             ss.append(row)
             current_row += 1
-            for student in filter(lambda s:s.kitapcik == g, self.exam.students):
+            for student in filter(lambda s:s.kitapcik == g or i == 0 and s.kitapcik in [" ", "*"], self.exam.students):
                 corrects = []
                 student_answers = []
                 for q in range(answer.question_count):
                     student_answers.append(answer.get_student_answer(q, student.cevaplar))
-                    corrects.append(answer.check_question(q, student_answers))
+                    corrects.append(answer.check_question(q, student.cevaplar))
                 srow = [student.ogrno, student.adi, student.kitapcik] + student_answers
                 ss.append(srow)
                 # Fill backround colors(correct/incorrect)
@@ -168,6 +169,7 @@ class MyMainWindow(QMainWindow):
             return
 
         self.exam = Exam(filename, self.toplamPuan.value())
+        self.dersinAdi.setText(os.path.basename(filename).removesuffix(".txt"))
         self.kitapcikSayisi.setText(str(self.exam.group_count))
         self.ogrenciSayisi.setText(str(self.exam.total_student_count))
         self.not_goster()
