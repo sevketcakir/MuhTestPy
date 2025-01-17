@@ -17,6 +17,7 @@ class MyMainWindow(QMainWindow):
         self.okIliskilendir.stateChanged.connect(self.iliskilendir)
         self.table_model = None
         self.exam = None
+        self.last_directory = os.getcwd()
         self.set_table_headers()
 
     def iliskilendir(self):
@@ -108,9 +109,12 @@ class MyMainWindow(QMainWindow):
 
 
     def excele_aktar(self):
-        filename,_ = QFileDialog.getSaveFileName(self, "Excel'e Aktar", self.dersinAdi.text()+".xlsx", "Excel dosyaları(*.xlsx)")
-        if not filename:
+        filename = f"{self.dersinAdi.text()}.xlsx"
+        path = os.path.join(self.last_directory, filename)
+        file_name,_ = QFileDialog.getSaveFileName(self, "Excel'e Aktar", path, "Excel dosyaları(*.xlsx)")
+        if not file_name:
             return
+        self.last_directory = os.path.dirname(file_name)
         wb = Workbook()
 
         style = NamedStyle("Baslik")
@@ -129,7 +133,7 @@ class MyMainWindow(QMainWindow):
             self.iliski_yazdir(outcome_sheet)
 
 
-        wb.save(filename)
+        wb.save(file_name)
 
     def iliski_yazdir(self, rs):
         soru_sayisi = self.exam.answers[max(self.exam.answers, key=lambda a:self.exam.answers[a].question_count)].question_count
@@ -164,10 +168,11 @@ class MyMainWindow(QMainWindow):
             self.notlarTablo.setColumnWidth(i, w)
 
     def dosya_ac(self):
-        filename,_ = QFileDialog.getOpenFileName(self, "Dosya Aç", ".", "Metin dosyaları(*.txt)")
+        filename,_ = QFileDialog.getOpenFileName(self, "Dosya Aç", self.last_directory, "Metin dosyaları(*.txt)")
         if not filename:
             return
 
+        self.last_directory = os.path.dirname(filename)
         self.exam = Exam(filename, self.toplamPuan.value())
         self.dersinAdi.setText(os.path.basename(filename).removesuffix(".txt"))
         self.kitapcikSayisi.setText(str(self.exam.group_count))
