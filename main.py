@@ -81,7 +81,13 @@ class MyMainWindow(QMainWindow):
         correct_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")  # Light green
         incorrect_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")  # Light red
         current_row = 2
-        maxq = self.exam.answers[max(self.exam.answers, key=lambda a:self.exam.answers[a].question_count)].question_count
+        #maxq = self.exam.answers[max(self.exam.answers, key=lambda a:self.exam.answers[a].question_count)].question_count
+        maxq = -1
+        for a in self.exam.answers:
+            answer:Answers = self.exam.answers[a]
+            if max(answer.mapping)+1 > maxq:
+                maxq = max(answer.mapping)+1
+
         header = ["Öğr.No.", "Adı", "Grubu"] + [f"S{i+1}" for i in range(maxq)]
         ss.append(header)
         # set column widhts
@@ -90,20 +96,27 @@ class MyMainWindow(QMainWindow):
             ss.column_dimensions[c].width = w * 0.13
         for i,g in enumerate(self.exam.answers):
             answer:Answers = self.exam.answers[g]
-            row = ["", "CEVAP", g] + [c for c in answer.answers if c != " "]
+            row = ["", "CEVAP", g] + [c for c in answer.answers]
             ss.append(row)
             current_row += 1
             for student in filter(lambda s:s.kitapcik == g or i == 0 and s.kitapcik in [" ", "*"], self.exam.students):
                 corrects = []
                 student_answers = []
-                for q in range(answer.question_count):
+                offset = 0
+                for q,m in zip(range(answer.question_count), answer.mapping):
+                    if q + offset != m:
+                        offset += 1
+                        student_answers.append(student.cevaplar[q])
                     student_answers.append(answer.get_student_answer(q, student.cevaplar))
                     corrects.append(answer.check_question(q, student.cevaplar))
                 srow = [student.ogrno, student.adi, student.kitapcik] + student_answers
                 ss.append(srow)
                 # Fill backround colors(correct/incorrect)
-                for column in range(answer.question_count):
-                    cell = ss.cell(current_row, column+4)
+                offset = 0
+                for column,m in zip(range(answer.question_count), answer.mapping):
+                    if column + offset != m:
+                        offset += 1
+                    cell = ss.cell(current_row, column+4+offset)
                     cell.fill = correct_fill if corrects[column] else incorrect_fill
                 current_row += 1
 
