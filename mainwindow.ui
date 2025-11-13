@@ -212,7 +212,6 @@
                   <property name="font">
                    <font>
                     <pointsize>10</pointsize>
-                    <weight>75</weight>
                     <bold>true</bold>
                    </font>
                   </property>
@@ -270,7 +269,6 @@
                   <property name="font">
                    <font>
                     <pointsize>10</pointsize>
-                    <weight>75</weight>
                     <bold>true</bold>
                    </font>
                   </property>
@@ -315,7 +313,7 @@
           <item>
            <widget class="QTableWidget" name="notlarTablo">
             <property name="selectionBehavior">
-             <enum>QAbstractItemView::SelectRows</enum>
+             <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
             </property>
             <property name="sortingEnabled">
              <bool>true</bool>
@@ -365,6 +363,16 @@
         </item>
        </layout>
       </widget>
+      <widget class="QWidget" name="tab">
+       <attribute name="title">
+        <string>Bilgi Mesajları</string>
+       </attribute>
+       <layout class="QGridLayout" name="gridLayout_4">
+        <item row="0" column="0">
+         <widget class="QPlainTextEdit" name="bilgiMesaji"/>
+        </item>
+       </layout>
+      </widget>
      </widget>
     </item>
    </layout>
@@ -375,7 +383,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>20</height>
+     <height>24</height>
     </rect>
    </property>
   </widget>

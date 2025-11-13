@@ -1,12 +1,38 @@
 import sys
 import os
+import logging
 from PySide6.QtWidgets import QApplication, QMainWindow, QFileDialog, QTableWidgetItem
+from PySide6.QtCore import QObject, Signal, Slot, QSettings
 from uiloader import loadUi
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, NamedStyle, Border, Side, PatternFill
 from pathlib import Path
 from learning_outcome import LearningOutcomeModel, ComboBoxDelegate
 from exam import Ogrenci, Exam, Answers
+
+# ------ Logging --------
+class LogEmitter(QObject):
+    """A QObject that emits signals for logging."""
+    log_signal = Signal(str)
+
+class QLogHandler(logging.Handler):
+    """
+    A custom logging handler that emits signals to be connected 
+    to a QPlainTextEdit widget.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.emitter = LogEmitter()
+
+    def emit(self, record):
+        """
+        This method is called by the logging module when a log message
+        is generated. We format the message and emit it.
+        """
+        msg = self.format(record)
+        self.emitter.log_signal.emit(msg)
+# ------ Logging --------
+
 
 class MyMainWindow(QMainWindow):
     def __init__(self):
@@ -17,8 +43,50 @@ class MyMainWindow(QMainWindow):
         self.okIliskilendir.stateChanged.connect(self.iliskilendir)
         self.table_model = None
         self.exam = None
-        self.last_directory = os.getcwd()
+        self.settings = QSettings("PAUMuhendislik", "SinavOkuma")
+        self.last_directory = self.settings.value("last_directory", os.getcwd())
         self.set_table_headers()
+        if hasattr(self, 'bilgiMesaji'):
+                    self.bilgiMesaji.setReadOnly(True)
+        else:
+            print("WARNING: 'bilgiMesaji' widget not found in .ui file. Logging will only go to console.")
+        
+        self.setup_logging()
+        logging.info("Uygulama başladı. Sınav dosyası yüklenmeye hazır.")
+
+    @Slot(str) 
+    def append_log_message(self, message):
+        """Append a log message to the bilgiMesaji widget."""
+        if hasattr(self, 'bilgiMesaji'):
+            self.bilgiMesaji.appendPlainText(message)
+
+    def setup_logging(self):
+        """Configure the logging system."""
+        
+        # 1. Create our custom QLogHandler
+        self.log_handler = QLogHandler()
+
+        # 2. Create a formatter
+        formatter = logging.Formatter(
+            '%(asctime)s [%(levelname)-8s] (%(module)s) %(message)s',
+            datefmt='%H:%M:%S'
+        )
+        self.log_handler.setFormatter(formatter)
+
+        # 3. Connect the handler's signal to our slot
+        self.log_handler.emitter.log_signal.connect(self.append_log_message)
+
+        # 4. Get the root logger and set its level
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO) # Log INFO and above (WARNING, ERROR)
+        
+        # 5. Add our custom handler to the root logger
+        logger.addHandler(self.log_handler)
+
+        # (Optional) Add a standard console logger too
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setFormatter(formatter)
+        logger.addHandler(stdout_handler)
 
     def iliskilendir(self):
         #print(self.okIliskilendir.isChecked())
@@ -213,6 +281,13 @@ class MyMainWindow(QMainWindow):
             nt.setItem(i, 6, QTableWidgetItem(str(ogrenci.bos)))
             nt.setItem(i, 7, QTableWidgetItem(str(ogrenci.puan)))
 
+    def closeEvent(self, event):
+            """
+            This method is called when the user closes the window.
+            We use it to save our settings.
+            """
+            self.settings.setValue("last_directory", self.last_directory)
+            super().closeEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

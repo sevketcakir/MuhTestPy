@@ -1,5 +1,5 @@
 from typing import List
-
+import logging
 
 class Ogrenci:
     def __init__(self, ogrno, sube, adi, ogretim, kitapcik, cevaplar) -> None:
@@ -57,13 +57,23 @@ class Exam:
 
     def open_file(self, filename):
         with open(filename, encoding="ISO-8859-9") as f:
+            logging.info(f"{filename} dosyası açılıyor.")
             lines = f.readlines()
+            logging.info(f"{len(lines)} satır okundu.")
         for line in lines:
             ogr, liste = self.process_line(line)
             if ogr:
                 self.students.append(Ogrenci(*liste))
             else:
-                self.answers[liste[0]] = Answers(liste[0], liste[1])
+                logging.info(f"Cevap okunuyor. Cevap grubu: {liste[0]}")
+                if liste[0] == " ":
+                    grup = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                    grup = grup[self.group_count]
+                    logging.warning(f"Cevap grubu boş girilmiş. Yeni grup {grup} olarak seçiliyor")
+                    self.answers[grup] = Answers(grup, liste[1])
+                else:
+                    logging.info(f"Cevap grubu {liste[0]} eklendi.")
+                    self.answers[liste[0]] = Answers(liste[0], liste[1])
                 self.group_count += 1
         self.calculate_grades()
 
@@ -80,6 +90,7 @@ class Exam:
             # choose the first one as his/her group
             if student_group not in self.answers:
                 student_group = next(iter(self.answers))
+                logging.warning(f"{student.ogrno} - {student.adi} grubu bulunamadı. Grup {student_group} olarak seçiliyor.")
 
             answer:Answers = self.answers[student_group]
             answer.student_count += 1
@@ -95,8 +106,8 @@ class Exam:
                 else:
                     student.yanlis += 1
                     answer.statistics[q]["incorrect"] += 1
-
             student.puan = round(student.dogru/answer.question_count*self.total_points)
+            logging.info(f"{student.ogrno} - {student.adi} cevapları okundu. Doğru: {student.dogru} Yanlış: {student.yanlis} Boş: {student.bos} Puan: {student.puan}")
 
     def calculate_learnig_outcome_contributions(self, mapping, outcome_count):
         self.outcome_mapping = mapping
