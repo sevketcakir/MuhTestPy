@@ -10,6 +10,7 @@ Program klasörü içinde bulunan ```run.bat``` dosyası çalıştırılabilir. 
 
 ## Önemli Hususlar
 - Grubunu işaretlemeyi unutan öğrencilerin grubu, sınavdaki ilk grup olarak seçilir.
+- Eğer öğretim elemanı cevap grubunu işaretlemezse, sıradaki boş grup olarak atanır.
 - Cevap anahtarlarının isim kısmına sadece "CEVAP" işaretlenmelidir.
 - Sınavda iptal edilmek istenen sorular varsa cevap anahtarında bu sorular boş bırakılmalıdır.
 - Soru-öğrenme kazanımı ilişkilendirmesinde boş bırakılan seçenekler olursa, ilk öğrenme kazanımı(ÖK1) ile ilişkilendirilir.
