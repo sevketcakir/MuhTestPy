@@ -17,7 +17,7 @@ class LogEmitter(QObject):
 
 class QLogHandler(logging.Handler):
     """
-    A custom logging handler that emits signals to be connected 
+    A custom logging handler that emits signals to be connected
     to a QPlainTextEdit widget.
     """
     def __init__(self, *args, **kwargs):
@@ -50,11 +50,11 @@ class MyMainWindow(QMainWindow):
                     self.bilgiMesaji.setReadOnly(True)
         else:
             print("WARNING: 'bilgiMesaji' widget not found in .ui file. Logging will only go to console.")
-        
+
         self.setup_logging()
         logging.info("Uygulama başladı. Sınav dosyası yüklenmeye hazır.")
 
-    @Slot(str) 
+    @Slot(str)
     def append_log_message(self, message):
         """Append a log message to the bilgiMesaji widget."""
         if hasattr(self, 'bilgiMesaji'):
@@ -62,7 +62,7 @@ class MyMainWindow(QMainWindow):
 
     def setup_logging(self):
         """Configure the logging system."""
-        
+
         # 1. Create our custom QLogHandler
         self.log_handler = QLogHandler()
 
@@ -79,7 +79,7 @@ class MyMainWindow(QMainWindow):
         # 4. Get the root logger and set its level
         logger = logging.getLogger()
         logger.setLevel(logging.INFO) # Log INFO and above (WARNING, ERROR)
-        
+
         # 5. Add our custom handler to the root logger
         logger.addHandler(self.log_handler)
 
@@ -195,6 +195,7 @@ class MyMainWindow(QMainWindow):
         file_name,_ = QFileDialog.getSaveFileName(self, "Excel'e Aktar", path, "Excel dosyaları(*.xlsx)")
         if not file_name:
             return
+        logging.info(f"Sonuçlar {file_name} dosyasına aktarılıyor.")
         self.last_directory = os.path.dirname(file_name)
         wb = Workbook()
 
@@ -215,6 +216,7 @@ class MyMainWindow(QMainWindow):
 
 
         wb.save(file_name)
+        logging.info("Excel dosyası başarıyla oluşturuldu.")
 
     def iliski_yazdir(self, rs):
         soru_sayisi = self.exam.answers[max(self.exam.answers, key=lambda a:self.exam.answers[a].question_count)].question_count
@@ -282,10 +284,6 @@ class MyMainWindow(QMainWindow):
             nt.setItem(i, 7, QTableWidgetItem(str(ogrenci.puan)))
 
     def closeEvent(self, event):
-            """
-            This method is called when the user closes the window.
-            We use it to save our settings.
-            """
             self.settings.setValue("last_directory", self.last_directory)
             super().closeEvent(event)
 

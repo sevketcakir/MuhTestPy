@@ -75,6 +75,7 @@ class Exam:
                     logging.info(f"Cevap grubu {liste[0]} eklendi.")
                     self.answers[liste[0]] = Answers(liste[0], liste[1])
                 self.group_count += 1
+        logging.info(f"Cevaplar ve öğrenciler okundu. Toplam {len(self.students)} öğrenci, {len(self.answers)} cevap grubu.")
         self.calculate_grades()
 
     def process_line(self, line):
